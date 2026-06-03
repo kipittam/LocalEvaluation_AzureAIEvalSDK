@@ -1,0 +1,60 @@
+{
+    "groundedness": 4.0,
+    "gpt_groundedness": 4.0,
+    "groundedness_reason": "The response is accurate but vague, as it does not fully engage with the specific details in the context.",
+    "groundedness_result": "pass",
+    "groundedness_threshold": 3.0,
+    "groundedness_prompt_tokens": 1139.0,
+    "groundedness_completion_tokens": 107.5,
+    "groundedness_total_tokens": 1246.5,
+    "evaluation_per_turn": {
+        "groundedness": [
+            5.0,
+            3.0
+        ],
+        "gpt_groundedness": [
+            5.0,
+            3.0
+        ],
+        "groundedness_reason": [
+            "The response is fully aligned with the context, accurately conveying the information without any errors or omissions.",
+            "The response is accurate but vague, as it does not fully engage with the specific details in the context."
+        ],
+        "groundedness_result": [
+            "pass",
+            "pass"
+        ],
+        "groundedness_threshold": [
+            3,
+            3
+        ],
+        "groundedness_prompt_tokens": [
+            1149,
+            1129
+        ],
+        "groundedness_completion_tokens": [
+            99,
+            116
+        ],
+        "groundedness_total_tokens": [
+            1248,
+            1245
+        ],
+        "groundedness_finish_reason": [
+            "stop",
+            "stop"
+        ],
+        "groundedness_model": [
+            "gpt-4o-2024-11-20",
+            "gpt-4o-2024-11-20"
+        ],
+        "groundedness_sample_input": [
+            "[{\"role\": \"user\", \"content\": \"{\\\"response\\\": \\\"The Alpine Explorer Tent is the most waterproof\\\", \\\"context\\\": \\\"{'response_context': 'From the our product list the alpine explorer tent is the most waterproof. The Adventure Dining Table has higher weight.'}\\\"}\"}]",
+            "[{\"role\": \"user\", \"content\": \"{\\\"response\\\": \\\"$120.\\\", \\\"context\\\": \\\"{'response_context': 'The Alpine Explorer Tent is $120.'}\\\"}\"}]"
+        ],
+        "groundedness_sample_output": [
+            "[{\"role\": \"assistant\", \"content\": \"<S0>Let's think step by step: The context states that the Alpine Explorer Tent is the most waterproof. The response, \\\"The Alpine Explorer Tent is the most waterproof,\\\" directly repeats this information without adding or omitting any details. It is accurate, fully grounded in the context, and complete.</S0>  \\n<S1>The response is fully aligned with the context, accurately conveying the information without any errors or omissions.</S1>  \\n<S2>5</S2>  \"}]",
+            "[{\"role\": \"assistant\", \"content\": \"<S0>Let's think step by step: The context specifies that \\\"The Alpine Explorer Tent is $120.\\\" The response is \\\"$120.\\\" While the response is accurate and directly relates to the context, it is overly vague and does not provide the full information about what the $120 refers to. It lacks specificity and detail, as it does not mention the Alpine Explorer Tent.</S0>  \\n<S1>The response is accurate but vague, as it does not fully engage with the specific details in the context.</S1>  \\n<S2>3</S2>  \"}]"
+        ]
+    }
+}
