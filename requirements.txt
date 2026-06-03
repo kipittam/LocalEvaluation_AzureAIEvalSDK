@@ -1,0 +1,5 @@
+azure-ai-evaluation
+azure-identity
+python-dotenv
+matplotlib
+numpy

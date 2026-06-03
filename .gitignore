@@ -1,0 +1,15 @@
+# Virtual environment
+.azureaieval/
+.venv/
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Evaluation output
+evaluation/output/
+evaluation/eval_tests/output/

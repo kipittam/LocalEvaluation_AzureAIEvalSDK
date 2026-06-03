@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Evaluation Workflow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f0f1a;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+  }
+
+  canvas { display: block; }
+
+  #scene-container {
+    width: 960px;
+    height: 540px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  /* Grid floor */
+  .grid-floor {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 180px;
+    background: 
+      linear-gradient(180deg, transparent 0%, rgba(100,100,255,0.03) 100%),
+      repeating-linear-gradient(90deg, rgba(100,150,255,0.06) 0px, rgba(100,150,255,0.06) 1px, transparent 1px, transparent 60px),
+      repeating-linear-gradient(0deg, rgba(100,150,255,0.06) 0px, rgba(100,150,255,0.06) 1px, transparent 1px, transparent 60px);
+    transform: perspective(500px) rotateX(45deg);
+    transform-origin: bottom;
+  }
+
+  /* Particles */
+  .particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: rgba(100,150,255,0.4);
+    border-radius: 50%;
+    animation: float-particle linear infinite;
+  }
+
+  @keyframes float-particle {
+    0% { transform: translateY(540px) scale(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(-20px) scale(1); opacity: 0; }
+  }
+
+  /* Scene label */
+  .scene-label {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(200,210,255,0.9);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    z-index: 100;
+    text-shadow: 0 0 20px rgba(100,150,255,0.5);
+  }
+
+  .scene-label.visible { opacity: 1; }
+
+  /* Progress bar */
+  .progress-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6c5ce7, #a29bfe, #74b9ff);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  /* Step indicators */
+  .step-dots {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+
+  .step-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    transition: all 0.4s ease;
+  }
+
+  .step-dot.active {
+    background: #a29bfe;
+    box-shadow: 0 0 8px rgba(162,155,254,0.6);
+    transform: scale(1.3);
+  }
+
+  .step-dot.done {
+    background: rgba(162,155,254,0.4);
+  }
+
+  /* Characters */
+  .character {
+    position: absolute;
+    transition: all 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 10;
+  }
+
+  /* Girl character */
+  .girl {
+    bottom: 120px;
+    left: -120px;
+  }
+
+  .girl-body {
+    position: relative;
+    width: 60px;
+    height: 120px;
+  }
+
+  .girl-head {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+    border-radius: 50%;
+    margin: 0 auto;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(253,203,110,0.3);
+  }
+
+  .girl-eyes {
+    position: absolute;
+    top: 14px;
+    left: 8px;
+    width: 24px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .girl-eye {
+    width: 5px;
+    height: 6px;
+    background: #2d3436;
+    border-radius: 50%;
+    animation: blink 3s infinite;
+  }
+
+  @keyframes blink {
+    0%, 95%, 100% { transform: scaleY(1); }
+    97% { transform: scaleY(0.1); }
+  }
+
+  .girl-mouth {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 4px;
+    border-bottom: 2px solid #e17055;
+    border-radius: 0 0 50% 50%;
+  }
+
+  .girl-hair {
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    width: 50px;
+    height: 28px;
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    border-radius: 25px 25px 0 0;
+    z-index: -1;
+  }
+
+  .girl-hair::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    right: -3px;
+    width: 12px;
+    height: 35px;
+    background: linear-gradient(180deg, #a29bfe, #6c5ce7);
+    border-radius: 0 0 6px 6px;
+  }
+
+  .girl-torso {
+    width: 36px;
+    height: 40px;
+    background: linear-gradient(180deg, #74b9ff, #0984e3);
+    margin: 4px auto 0;
+    border-radius: 8px 8px 4px 4px;
+    position: relative;
+  }
+
+  .girl-torso::after {
+    content: '⭐';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+  }
+
+  .girl-legs {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .girl-leg {
+    width: 12px;
+    height: 30px;
+    background: linear-gradient(180deg, #2d3436, #636e72);
+    border-radius: 0 0 4px 4px;
+  }
+
+  .girl-arm {
+    position: absolute;
+    width: 10px;
+    height: 30px;
+    background: linear-gradient(180deg, #74b9ff, #0984e3);
+    border-radius: 5px;
+    top: 48px;
+    transition: transform 0.5s ease;
+    transform-origin: top center;
+  }
+
+  .girl-arm.left { left: 2px; }
+  .girl-arm.right { right: 2px; }
+
+  .girl.waving .girl-arm.right {
+    animation: wave 0.6s ease-in-out infinite alternate;
+  }
+
+  @keyframes wave {
+    0% { transform: rotate(-20deg); }
+    100% { transform: rotate(-60deg); }
+  }
+
+  .girl.typing .girl-arm.left {
+    animation: type-left 0.3s ease-in-out infinite alternate;
+  }
+  .girl.typing .girl-arm.right {
+    animation: type-right 0.3s ease-in-out infinite alternate-reverse;
+  }
+
+  @keyframes type-left {
+    0% { transform: rotate(15deg) translateY(2px); }
+    100% { transform: rotate(25deg) translateY(-2px); }
+  }
+  @keyframes type-right {
+    0% { transform: rotate(-25deg) translateY(-2px); }
+    100% { transform: rotate(-15deg) translateY(2px); }
+  }
+
+  .girl.walking {
+    animation: walk-bounce 0.5s ease-in-out infinite;
+  }
+
+  @keyframes walk-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  /* Robot character */
+  .robot {
+    bottom: 120px;
+    left: 200px;
+    opacity: 0;
+    transition: all 0.8s ease;
+  }
+
+  .robot.visible { opacity: 1; }
+
+  .robot-body {
+    position: relative;
+    width: 80px;
+    height: 130px;
+  }
+
+  .robot-head {
+    width: 55px;
+    height: 45px;
+    background: linear-gradient(135deg, #dfe6e9, #b2bec3);
+    border-radius: 12px;
+    margin: 0 auto;
+    position: relative;
+    border: 2px solid rgba(116,185,255,0.4);
+    box-shadow: 0 0 20px rgba(116,185,255,0.2);
+  }
+
+  .robot-antenna {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 12px;
+    background: #b2bec3;
+  }
+
+  .robot-antenna::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: -4px;
+    width: 10px;
+    height: 10px;
+    background: #74b9ff;
+    border-radius: 50%;
+    animation: antenna-glow 1.5s ease-in-out infinite;
+  }
+
+  @keyframes antenna-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(116,185,255,0.5); }
+    50% { box-shadow: 0 0 15px rgba(116,185,255,0.9), 0 0 30px rgba(116,185,255,0.4); }
+  }
+
+  .robot-eyes {
+    position: absolute;
+    top: 12px;
+    left: 10px;
+    width: 35px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .robot-eye {
+    width: 12px;
+    height: 12px;
+    background: #74b9ff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(116,185,255,0.6);
+    animation: robot-blink 4s infinite;
+  }
+
+  @keyframes robot-blink {
+    0%, 93%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(0.1); }
+  }
+
+  .robot-mouth {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 3px;
+    background: #74b9ff;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+  }
+
+  .robot.talking .robot-mouth {
+    animation: robot-talk 0.2s ease infinite alternate;
+  }
+
+  @keyframes robot-talk {
+    0% { height: 3px; width: 20px; }
+    100% { height: 8px; width: 16px; border-radius: 4px; }
+  }
+
+  .robot-torso {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(180deg, #dfe6e9, #b2bec3);
+    margin: 5px auto 0;
+    border-radius: 8px;
+    position: relative;
+    border: 2px solid rgba(116,185,255,0.3);
+  }
+
+  .robot-screen {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 30px;
+    height: 30px;
+    background: #0a0a1a;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .robot-screen-content {
+    color: #74b9ff;
+    font-size: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .robot-arm {
+    position: absolute;
+    width: 12px;
+    height: 35px;
+    background: linear-gradient(180deg, #b2bec3, #636e72);
+    border-radius: 6px;
+    top: 52px;
+  }
+
+  .robot-arm.left { left: 2px; }
+  .robot-arm.right { right: 2px; }
+
+  .robot-legs {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 3px;
+  }
+
+  .robot-leg {
+    width: 14px;
+    height: 20px;
+    background: linear-gradient(180deg, #636e72, #2d3436);
+    border-radius: 0 0 4px 4px;
+  }
+
+  /* Judge character */
+  .judge {
+    bottom: 120px;
+    right: -150px;
+    opacity: 0;
+    transition: all 0.8s ease;
+  }
+
+  .judge.visible { opacity: 1; }
+
+  .judge-body {
+    position: relative;
+    width: 80px;
+    height: 140px;
+  }
+
+  .judge-head {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+    border-radius: 50%;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .judge-crown {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 22px;
+    filter: drop-shadow(0 0 8px rgba(253,203,110,0.6));
+  }
+
+  .judge-glasses {
+    position: absolute;
+    top: 12px;
+    left: 5px;
+    width: 34px;
+    height: 12px;
+  }
+
+  .judge-lens {
+    position: absolute;
+    width: 13px;
+    height: 10px;
+    border: 2px solid #2d3436;
+    border-radius: 3px;
+    top: 0;
+  }
+
+  .judge-lens.left { left: 0; }
+  .judge-lens.right { right: 0; }
+
+  .judge-lens-bridge {
+    position: absolute;
+    top: 4px;
+    left: 13px;
+    width: 8px;
+    height: 2px;
+    background: #2d3436;
+  }
+
+  .judge-mouth {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 2px;
+    background: #636e72;
+    border-radius: 1px;
+  }
+
+  .judge-robe {
+    width: 55px;
+    height: 55px;
+    background: linear-gradient(180deg, #2d3436, #1a1a2e);
+    margin: 4px auto 0;
+    border-radius: 8px 8px 4px 4px;
+    position: relative;
+    border: 1px solid rgba(253,203,110,0.2);
+  }
+
+  .judge-badge {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+  }
+
+  .judge-gpt-label {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(253,203,110,0.8);
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .judge-legs {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 2px;
+  }
+
+  .judge-leg {
+    width: 14px;
+    height: 28px;
+    background: linear-gradient(180deg, #2d3436, #1a1a2e);
+    border-radius: 0 0 4px 4px;
+  }
+
+  /* Thought/speech bubbles */
+  .bubble {
+    position: absolute;
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: #2d3436;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 50;
+    max-width: 200px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .bubble.visible {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  .bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid rgba(255,255,255,0.95);
+  }
+
+  .bubble.right::after {
+    left: auto;
+    right: 20px;
+  }
+
+  .bubble.question {
+    border: 2px solid rgba(108,92,231,0.3);
+  }
+
+  .bubble.answer {
+    border: 2px solid rgba(116,185,255,0.3);
+    background: rgba(240,248,255,0.95);
+  }
+
+  .bubble .q-mark {
+    color: #6c5ce7;
+    font-weight: 700;
+    margin-right: 4px;
+  }
+
+  /* JSON display */
+  .json-display {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: #1a1a2e;
+    border: 1px solid rgba(116,185,255,0.3);
+    border-radius: 12px;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #74b9ff;
+    width: 320px;
+    opacity: 0;
+    transition: all 0.6s ease;
+    z-index: 60;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4), 0 0 30px rgba(116,185,255,0.1);
+  }
+
+  .json-display.visible { opacity: 1; }
+
+  .json-display .json-header {
+    color: rgba(162,155,254,0.8);
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+
+  .json-key { color: #a29bfe; }
+  .json-string { color: #55efc4; }
+  .json-bracket { color: #636e72; }
+  .json-new-field { color: #fdcb6e; background: rgba(253,203,110,0.1); padding: 1px 3px; border-radius: 2px; }
+
+  /* Evaluation panel */
+  .eval-panel {
+    position: absolute;
+    right: 40px;
+    top: 60px;
+    width: 250px;
+    background: rgba(26,26,46,0.95);
+    border: 1px solid rgba(253,203,110,0.3);
+    border-radius: 12px;
+    padding: 16px;
+    opacity: 0;
+    transition: all 0.6s ease;
+    z-index: 60;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4), 0 0 20px rgba(253,203,110,0.1);
+  }
+
+  .eval-panel.visible { opacity: 1; }
+
+  .eval-panel-header {
+    color: #fdcb6e;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .eval-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.5s ease;
+  }
+
+  .eval-metric.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .eval-metric-name {
+    color: rgba(255,255,255,0.8);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .eval-metric-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    margin: 0 10px;
+    overflow: hidden;
+  }
+
+  .eval-metric-fill {
+    height: 100%;
+    border-radius: 3px;
+    width: 0%;
+    transition: width 1s ease;
+  }
+
+  .eval-metric-fill.groundedness { background: linear-gradient(90deg, #00b894, #55efc4); }
+  .eval-metric-fill.relevance { background: linear-gradient(90deg, #0984e3, #74b9ff); }
+  .eval-metric-fill.similarity { background: linear-gradient(90deg, #6c5ce7, #a29bfe); }
+
+  .eval-metric-score {
+    color: #fdcb6e;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    min-width: 35px;
+    text-align: right;
+  }
+
+  /* Token charges */
+  .token-charges {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    opacity: 0;
+    transition: all 0.5s ease;
+  }
+
+  .token-charges.visible { opacity: 1; }
+
+  .token-header {
+    color: rgba(255,255,255,0.5);
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .token-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 10px;
+  }
+
+  .token-label { color: rgba(255,255,255,0.6); }
+  .token-value { color: #74b9ff; font-family: 'JetBrains Mono', monospace; }
+  .token-total { color: #fdcb6e; font-weight: 700; }
+
+  /* Data collection cards */
+  .data-card {
+    position: absolute;
+    background: rgba(26,26,46,0.9);
+    border: 1px solid rgba(116,185,255,0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #74b9ff;
+    opacity: 0;
+    transition: all 0.5s ease;
+    z-index: 40;
+  }
+
+  .data-card.visible { opacity: 1; }
+
+  .data-card .card-label {
+    color: rgba(162,155,254,0.7);
+    font-size: 7px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  /* Clipboard/collection animation */
+  .clipboard {
+    position: absolute;
+    width: 50px;
+    height: 65px;
+    background: linear-gradient(180deg, #dfe6e9, #b2bec3);
+    border-radius: 6px;
+    opacity: 0;
+    transition: all 0.5s ease;
+    z-index: 45;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+
+  .clipboard.visible { opacity: 1; }
+
+  .clipboard-clip {
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 10px;
+    background: #636e72;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .clipboard-line {
+    width: 35px;
+    height: 2px;
+    background: rgba(116,185,255,0.3);
+    margin: 6px auto 0;
+    border-radius: 1px;
+  }
+
+  .clipboard-line.filled { background: rgba(116,185,255,0.7); }
+
+  /* Transition overlay */
+  .transition-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0f0f1a;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+
+  .transition-overlay.active { opacity: 1; }
+
+  /* Location labels */
+  .location-label {
+    position: absolute;
+    bottom: 80px;
+    color: rgba(255,255,255,0.15);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    transition: all 0.8s ease;
+    z-index: 1;
+  }
+
+  /* Glowing border lines for zones */
+  .zone-border {
+    position: absolute;
+    bottom: 100px;
+    width: 2px;
+    height: 350px;
+    background: linear-gradient(180deg, transparent, rgba(100,150,255,0.15), transparent);
+    z-index: 1;
+  }
+
+  /* Sound indicator */
+  .sound-ping {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(116,185,255,0.6);
+    opacity: 0;
+    z-index: 55;
+    animation: ping-expand 0.8s ease-out forwards;
+  }
+
+  @keyframes ping-expand {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
+  /* Title screen */
+  .title-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    transition: opacity 1s ease;
+  }
+
+  .title-main {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #a29bfe, #74b9ff, #55efc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .title-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 5px;
+    text-transform: uppercase;
+  }
+
+  /* Replay button */
+  .replay-btn {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 30px;
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    border: none;
+    border-radius: 25px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.5s ease;
+    z-index: 300;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .replay-btn.visible {
+    opacity: 1;
+  }
+
+  .replay-btn:hover {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 5px 20px rgba(108,92,231,0.4);
+  }
+
+  /* Typing cursor */
+  .cursor-blink {
+    display: inline-block;
+    width: 1px;
+    height: 10px;
+    background: #74b9ff;
+    animation: cursor-blink-anim 0.8s infinite;
+    margin-left: 2px;
+  }
+
+  @keyframes cursor-blink-anim {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div id="scene-container">
+  <!-- Particles -->
+  <div id="particles"></div>
+  
+  <!-- Grid floor -->
+  <div class="grid-floor"></div>
+
+  <!-- Transition overlay -->
+  <div class="transition-overlay" id="transition"></div>
+
+  <!-- Title screen -->
+  <div class="title-screen" id="title-screen">
+    <div class="title-main">Azure AI Evaluation SDK</div>
+    <div class="title-sub">Local Evaluation Workflow</div>
+  </div>
+
+  <!-- Scene label -->
+  <div class="scene-label" id="scene-label"></div>
+
+  <!-- Progress -->
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+  <div class="step-dots" id="step-dots"></div>
+
+  <!-- Location labels -->
+  <div class="location-label" id="loc-label" style="left: 50%; transform: translateX(-50%);"></div>
+
+  <!-- Girl -->
+  <div class="character girl" id="girl">
+    <div class="girl-body">
+      <div class="girl-hair"></div>
+      <div class="girl-head">
+        <div class="girl-eyes">
+          <div class="girl-eye"></div>
+          <div class="girl-eye"></div>
+        </div>
+        <div class="girl-mouth" id="girl-mouth"></div>
+      </div>
+      <div class="girl-arm left"></div>
+      <div class="girl-arm right"></div>
+      <div class="girl-torso"></div>
+      <div class="girl-legs">
+        <div class="girl-leg"></div>
+        <div class="girl-leg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Robot (AI Agent) -->
+  <div class="character robot" id="robot">
+    <div class="robot-body">
+      <div class="robot-head">
+        <div class="robot-antenna"></div>
+        <div class="robot-eyes">
+          <div class="robot-eye"></div>
+          <div class="robot-eye"></div>
+        </div>
+        <div class="robot-mouth" id="robot-mouth"></div>
+      </div>
+      <div class="robot-arm left"></div>
+      <div class="robot-arm right"></div>
+      <div class="robot-torso">
+        <div class="robot-screen">
+          <div class="robot-screen-content" id="robot-screen">AI<br>Agent</div>
+        </div>
+      </div>
+      <div class="robot-legs">
+        <div class="robot-leg"></div>
+        <div class="robot-leg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Judge (GPT-4.0) -->
+  <div class="character judge" id="judge">
+    <div class="judge-body">
+      <div class="judge-head">
+        <div class="judge-crown">⚖️</div>
+        <div class="judge-glasses">
+          <div class="judge-lens left"></div>
+          <div class="judge-lens right"></div>
+          <div class="judge-lens-bridge"></div>
+        </div>
+        <div class="judge-mouth"></div>
+      </div>
+      <div class="judge-robe">
+        <div class="judge-badge">🏛️</div>
+        <div class="judge-gpt-label">GPT-4.0</div>
+      </div>
+      <div class="judge-legs">
+        <div class="judge-leg"></div>
+        <div class="judge-leg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic elements container -->
+  <div id="dynamic-elements"></div>
+
+  <!-- Replay button -->
+  <button class="replay-btn" id="replay-btn" onclick="startAnimation()">▶ REPLAY</button>
+</div>
+
+<script>
+const container = document.getElementById('scene-container');
+const girl = document.getElementById('girl');
+const robot = document.getElementById('robot');
+const judge = document.getElementById('judge');
+const sceneLabel = document.getElementById('scene-label');
+const progress = document.getElementById('progress');
+const transition = document.getElementById('transition');
+const titleScreen = document.getElementById('title-screen');
+const dynamicEl = document.getElementById('dynamic-elements');
+const replayBtn = document.getElementById('replay-btn');
+const stepDotsContainer = document.getElementById('step-dots');
+
+const TOTAL_STEPS = 8;
+let currentStep = 0;
+let animationTimeout = null;
+
+// Create particles
+function createParticles() {
+  const particleContainer = document.getElementById('particles');
+  particleContainer.innerHTML = '';
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 960 + 'px';
+    p.style.animationDuration = (4 + Math.random() * 6) + 's';
+    p.style.animationDelay = Math.random() * 5 + 's';
+    p.style.width = (2 + Math.random() * 3) + 'px';
+    p.style.height = p.style.width;
+    particleContainer.appendChild(p);
+  }
+}
+
+// Create step dots
+function createStepDots() {
+  stepDotsContainer.innerHTML = '';
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'step-dot';
+    dot.id = `dot-${i}`;
+    stepDotsContainer.appendChild(dot);
+  }
+}
+
+function setStep(n) {
+  currentStep = n;
+  progress.style.width = ((n + 1) / TOTAL_STEPS * 100) + '%';
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    if (!dot) continue;
+    dot.className = 'step-dot';
+    if (i === n) dot.classList.add('active');
+    else if (i < n) dot.classList.add('done');
+  }
+}
+
+function setSceneLabel(text) {
+  sceneLabel.textContent = text;
+  sceneLabel.classList.add('visible');
+}
+
+function clearSceneLabel() {
+  sceneLabel.classList.remove('visible');
+}
+
+function clearDynamic() {
+  dynamicEl.innerHTML = '';
+}
+
+function addBubble(x, y, text, type = '', align = '') {
+  const b = document.createElement('div');
+  b.className = `bubble ${type} ${align}`;
+  b.innerHTML = text;
+  b.style.left = x + 'px';
+  b.style.bottom = y + 'px';
+  dynamicEl.appendChild(b);
+  requestAnimationFrame(() => { b.classList.add('visible'); });
+  return b;
+}
+
+function addSoundPing(x, y) {
+  const p = document.createElement('div');
+  p.className = 'sound-ping';
+  p.style.left = x + 'px';
+  p.style.bottom = y + 'px';
+  dynamicEl.appendChild(p);
+  setTimeout(() => p.remove(), 800);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => {
+    animationTimeout = setTimeout(resolve, ms);
+  });
+}
+
+async function doTransition() {
+  transition.classList.add('active');
+  await sleep(500);
+  clearDynamic();
+  transition.classList.remove('active');
+  await sleep(300);
+}
+
+async function startAnimation() {
+  // Reset everything
+  replayBtn.classList.remove('visible');
+  clearDynamic();
+  girl.style.left = '-120px';
+  girl.className = 'character girl';
+  robot.className = 'character robot';
+  robot.style.left = '200px';
+  judge.className = 'character judge';
+  judge.style.right = '-150px';
+  clearSceneLabel();
+
+  createParticles();
+  createStepDots();
+
+  // Title screen
+  titleScreen.style.opacity = '1';
+  titleScreen.style.display = 'flex';
+  await sleep(2500);
+  titleScreen.style.opacity = '0';
+  await sleep(1000);
+  titleScreen.style.display = 'none';
+
+  // ─── SCENE 1: Wide establishing shot ───
+  setStep(0);
+  setSceneLabel('Scene 1 — AI Agent Workspace');
+
+  // Show robot
+  robot.classList.add('visible');
+  document.getElementById('loc-label').textContent = 'AI AGENT ZONE';
+  document.getElementById('loc-label').style.opacity = '0.15';
+
+  await sleep(800);
+
+  // Girl walks in
+  girl.classList.add('walking');
+  girl.style.left = '100px';
+  await sleep(1200);
+  girl.classList.remove('walking');
+
+  // ─── SCENE 2: Girl asks questions ───
+  setStep(1);
+  await sleep(400);
+
+  girl.classList.add('waving');
+  await sleep(600);
+  girl.classList.remove('waving');
+
+  const questions = [
+    { q: "What is Azure AI?", a: "Azure AI is a collection of AI services..." },
+    { q: "How does eval work?", a: "Evaluators assess model quality using metrics..." },
+    { q: "What metrics exist?", a: "Groundedness, Relevance, Similarity, F1..." }
+  ];
+
+  for (let i = 0; i < questions.length; i++) {
+    // Girl asks
+    const qBubble = addBubble(40, 290 + i * 10, `<span class="q-mark">❓</span> ${questions[i].q}`, 'question');
+    girl.querySelector('.girl-mouth').style.borderBottomWidth = '3px';
+    await sleep(1200);
+    girl.querySelector('.girl-mouth').style.borderBottomWidth = '2px';
+    qBubble.classList.remove('visible');
+
+    // Robot responds
+    robot.classList.add('talking');
+    document.getElementById('robot-screen').innerHTML = `Q${i+1}<br>...`;
+    const aBubble = addBubble(215, 300, `💬 ${questions[i].a}`, 'answer', 'right');
+    addSoundPing(260, 310);
+    await sleep(1500);
+    robot.classList.remove('talking');
+    aBubble.classList.remove('visible');
+    await sleep(400);
+  }
+
+  // ─── SCENE 3: Girl collects responses ───
+  setStep(2);
+  setSceneLabel('Scene 2 — Collecting Responses');
+  await sleep(500);
+
+  // Show clipboard appearing
+  const clip = document.createElement('div');
+  clip.className = 'clipboard';
+  clip.style.left = '130px';
+  clip.style.bottom = '200px';
+  clip.innerHTML = `
+    <div class="clipboard-clip"></div>
+    <div class="clipboard-line"></div>
+    <div class="clipboard-line"></div>
+    <div class="clipboard-line"></div>
+    <div class="clipboard-line"></div>
+    <div class="clipboard-line"></div>
+  `;
+  dynamicEl.appendChild(clip);
+  await sleep(300);
+  clip.classList.add('visible');
+
+  // Fill lines one by one
+  const lines = clip.querySelectorAll('.clipboard-line');
+  for (let i = 0; i < lines.length; i++) {
+    await sleep(500);
+    lines[i].classList.add('filled');
+    addSoundPing(155, 250);
+  }
+
+  await sleep(800);
+
+  // ─── SCENE 4: Transition to editing area ───
+  await doTransition();
+
+  setStep(3);
+  setSceneLabel('Scene 3 — Adding Context & Ground Truth');
+  document.getElementById('loc-label').textContent = 'EDITING WORKSPACE';
+
+  // Position girl in middle
+  girl.style.left = '80px';
+  robot.style.left = '-150px';
+  robot.classList.remove('visible');
+
+  // Show JSON editing
+  girl.classList.add('typing');
+
+  const jsonDisplay = document.createElement('div');
+  jsonDisplay.className = 'json-display';
+  jsonDisplay.style.left = '55%';
+  jsonDisplay.innerHTML = `
+    <div class="json-header">📝 ENRICHING Q&A DATA</div>
+    <div id="json-content"></div>
+  `;
+  dynamicEl.appendChild(jsonDisplay);
+  await sleep(300);
+  jsonDisplay.classList.add('visible');
+
+  const jsonContent = document.getElementById('json-content');
+
+  // Type out JSON line by line
+  const jsonLines = [
+    '<span class="json-bracket">[{</span>',
+    '  <span class="json-key">"question"</span>: <span class="json-string">"What is Azure AI?"</span>,',
+    '  <span class="json-key">"answer"</span>: <span class="json-string">"Azure AI is a collection..."</span>,',
+    '  <span class="json-new-field">"context"</span>: <span class="json-string">"Azure docs, AI overview..."</span>,',
+    '  <span class="json-new-field">"ground_truth"</span>: <span class="json-string">"Azure AI provides..."</span>',
+    '<span class="json-bracket">},</span>',
+    '<span class="json-bracket">{</span>',
+    '  <span class="json-key">"question"</span>: <span class="json-string">"How does eval work?"</span>,',
+    '  <span class="json-key">"answer"</span>: <span class="json-string">"Evaluators assess..."</span>,',
+    '  <span class="json-new-field">"context"</span>: <span class="json-string">"Evaluation SDK docs..."</span>,',
+    '  <span class="json-new-field">"ground_truth"</span>: <span class="json-string">"The SDK evaluates..."</span>',
+    '<span class="json-bracket">}]</span>',
+  ];
+
+  for (const line of jsonLines) {
+    await sleep(350);
+    jsonContent.innerHTML += line + '<br>';
+  }
+
+  await sleep(600);
+  girl.classList.remove('typing');
+
+  // Highlight new fields
+  addBubble(540, 340, '✨ <strong>New fields added:</strong><br>• context<br>• ground_truth', '', '');
+  addSoundPing(400, 300);
+  await sleep(2000);
+
+  // ─── SCENE 5: Compile JSON ───
+  setStep(4);
+  setSceneLabel('Scene 4 — Compiling JSON Dataset');
+  await sleep(600);
+
+  // Show data forming into structured list
+  jsonDisplay.querySelector('.json-header').innerHTML = '📦 COMPILED: data.jsonl';
+  addSoundPing(480, 300);
+  await sleep(1500);
+
+  // ─── SCENE 6: Transition to Judge ───
+  await doTransition();
+
+  setStep(5);
+  setSceneLabel('Scene 5 — Approaching the Judge');
+  document.getElementById('loc-label').textContent = 'EVALUATION CHAMBER';
+
+  // Show judge
+  judge.classList.add('visible');
+  judge.style.right = '120px';
+
+  // Girl walks over
+  girl.classList.add('walking');
+  girl.style.left = '400px';
+  await sleep(1200);
+  girl.classList.remove('walking');
+
+  // Girl hands over data
+  const dataPacket = document.createElement('div');
+  dataPacket.className = 'data-card';
+  dataPacket.style.left = '470px';
+  dataPacket.style.bottom = '250px';
+  dataPacket.innerHTML = `
+    <div class="card-label">JSON DATASET</div>
+    📄 data.jsonl<br>
+    3 entries • 5 fields
+  `;
+  dynamicEl.appendChild(dataPacket);
+  await sleep(400);
+  dataPacket.classList.add('visible');
+  await sleep(800);
+
+  // Animate data packet moving to judge
+  dataPacket.style.left = '650px';
+  dataPacket.style.bottom = '270px';
+  dataPacket.style.transform = 'scale(0.8)';
+  await sleep(800);
+  dataPacket.classList.remove('visible');
+  addSoundPing(700, 280);
+  await sleep(600);
+
+  // ─── SCENE 7: Judge evaluates ───
+  setStep(6);
+  setSceneLabel('Scene 6 — Evaluation in Progress');
+  await sleep(500);
+
+  // Show eval panel
+  const evalPanel = document.createElement('div');
+  evalPanel.className = 'eval-panel';
+  evalPanel.innerHTML = `
+    <div class="eval-panel-header">⚖️ Evaluation Results</div>
+    <div class="eval-metric" id="metric-g">
+      <span class="eval-metric-name">Groundedness</span>
+      <div class="eval-metric-bar"><div class="eval-metric-fill groundedness" id="fill-g"></div></div>
+      <span class="eval-metric-score" id="score-g">—</span>
+    </div>
+    <div class="eval-metric" id="metric-r">
+      <span class="eval-metric-name">Relevance</span>
+      <div class="eval-metric-bar"><div class="eval-metric-fill relevance" id="fill-r"></div></div>
+      <span class="eval-metric-score" id="score-r">—</span>
+    </div>
+    <div class="eval-metric" id="metric-s">
+      <span class="eval-metric-name">Similarity</span>
+      <div class="eval-metric-bar"><div class="eval-metric-fill similarity" id="fill-s"></div></div>
+      <span class="eval-metric-score" id="score-s">—</span>
+    </div>
+    <div class="token-charges" id="token-charges">
+      <div class="token-header">💰 Token Charges</div>
+      <div class="token-row"><span class="token-label">Prompt tokens</span><span class="token-value">2,847</span></div>
+      <div class="token-row"><span class="token-label">Completion tokens</span><span class="token-value">1,234</span></div>
+      <div class="token-row"><span class="token-label">Total tokens</span><span class="token-value token-total">4,081</span></div>
+      <div class="token-row" style="margin-top:4px"><span class="token-label">Estimated cost</span><span class="token-value token-total">$0.0612</span></div>
+    </div>
+  `;
+  dynamicEl.appendChild(evalPanel);
+  await sleep(300);
+  evalPanel.classList.add('visible');
+  await sleep(600);
+
+  // Animate metrics one by one
+  const metrics = [
+    { id: 'g', score: 4.7, pct: 94 },
+    { id: 'r', score: 4.5, pct: 90 },
+    { id: 's', score: 4.2, pct: 84 }
+  ];
+
+  for (const m of metrics) {
+    const metric = document.getElementById(`metric-${m.id}`);
+    metric.classList.add('visible');
+    await sleep(400);
+    document.getElementById(`fill-${m.id}`).style.width = m.pct + '%';
+    await sleep(600);
+    document.getElementById(`score-${m.id}`).textContent = m.score.toFixed(1);
+    addSoundPing(820, 200);
+    await sleep(500);
+  }
+
+  // Show token charges
+  await sleep(400);
+  document.getElementById('token-charges').classList.add('visible');
+  addSoundPing(820, 120);
+
+  // ─── SCENE 8: Complete ───
+  await sleep(2000);
+  setStep(7);
+  setSceneLabel('Evaluation Complete ✓');
+
+  // Celebration ping
+  for (let i = 0; i < 3; i++) {
+    addSoundPing(480 + i * 40, 300 + i * 20);
+    await sleep(200);
+  }
+
+  await sleep(3000);
+
+  // Show replay
+  replayBtn.classList.add('visible');
+}
+
+// Auto-start
+window.addEventListener('load', () => {
+  setTimeout(startAnimation, 500);
+});
+</script>
+</body>
+</html>
